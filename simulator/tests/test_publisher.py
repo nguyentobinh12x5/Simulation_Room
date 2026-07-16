@@ -42,3 +42,9 @@ def test_non_object_json_command_is_ignored():
     assert handle_command(s, CMD_HVAC, b"5").hvac_on is True
     assert handle_command(s, CMD_HVAC, b'"on"').hvac_on is True
     assert handle_command(s, CMD_OCCUPANCY, b"[1, 2]").occupancy == 5
+
+
+def test_occupancy_bool_value_is_rejected():
+    s = RoomState(occupancy=5)
+    result = handle_command(s, CMD_OCCUPANCY, b'{"value": true}')
+    assert result.occupancy == 5

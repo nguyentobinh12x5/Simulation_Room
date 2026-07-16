@@ -128,7 +128,7 @@ def live_view():
             t0 = recent[0][0]
             sec = np.array([(x - t0).total_seconds() for x, _ in recent])
             vals = np.array([y for _, y in recent])
-            slope, intercept = np.polyfit(sec, vals, 1)
+            slope, _ = np.polyfit(sec, vals, 1)
             if slope > 0.001 and vals[-1] < ALERT_ON:
                 eta = (ALERT_ON - vals[-1]) / slope
                 if eta < 300:

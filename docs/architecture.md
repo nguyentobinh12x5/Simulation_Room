@@ -5,22 +5,22 @@
 ```mermaid
 flowchart TB
     subgraph L1["1. Physical/Simulated Layer"]
-        SIM["Simulator (physics.py + publisher.py)\nstate: temp, humidity, occupancy, hvac"]
+        SIM["Simulator (physics.py + publisher.py)<br/>state: temp, humidity, occupancy, hvac"]
     end
     subgraph L2["2. Data Acquisition"]
-        PUB["paho-mqtt publish\n3 topic sensor, chu kỳ 2-5s, JSON"]
+        PUB["paho-mqtt publish<br/>3 topic sensor, chu kỳ 2-5s, JSON"]
     end
     subgraph L3["3. Connectivity"]
-        BROKER["Mosquitto broker\n1883 MQTT / 9001 WebSocket"]
+        BROKER["Mosquitto broker<br/>1883 MQTT / 9001 WebSocket"]
     end
     subgraph L4["4. Data Processing"]
-        BUF["Background MQTT thread\ndeque buffer + lock"]
+        BUF["Background MQTT thread<br/>deque buffer + lock"]
     end
     subgraph L5["5. Application"]
-        DASH["Streamlit dashboard\nmetrics, chart, alert, predictive"]
+        DASH["Streamlit dashboard<br/>metrics, chart, alert, predictive"]
     end
     subgraph L6["6. Interaction"]
-        USER["Người dùng\nnút AC ON/OFF, xem 3D"]
+        USER["Người dùng<br/>nút AC ON/OFF, xem 3D"]
     end
     SIM --> PUB --> BROKER --> BUF --> DASH --> USER
     USER -. "cmd" .-> DASH

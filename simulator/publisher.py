@@ -45,7 +45,7 @@ def handle_command(state: RoomState, topic: str, payload: bytes) -> RoomState:
             return replace(state, hvac_on=(cmd == "on"))
     elif topic == CMD_OCCUPANCY:
         v = data.get("value")
-        if isinstance(v, int):
+        if isinstance(v, int) and not isinstance(v, bool):
             return replace(state, occupancy=clamp(v, OCC_MIN, OCC_MAX))
     return state
 
