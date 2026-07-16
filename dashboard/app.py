@@ -137,3 +137,7 @@ def live_view():
 
 
 live_view()
+
+# Can `python -m http.server 8000 --directory room3d` chay kem (ghi vao README)
+with st.expander("🧊 3D Room View", expanded=False):
+    st.components.v1.iframe("http://localhost:8000/room3d.html", height=500)

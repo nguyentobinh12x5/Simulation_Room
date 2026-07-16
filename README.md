@@ -13,6 +13,7 @@ pip install -r simulator/requirements.txt -r dashboard/requirements.txt
 
 python simulator/publisher.py              # terminal 1
 streamlit run dashboard/app.py             # terminal 2
+python -m http.server 8000 --directory room3d  # terminal 3, chỉ cần cho 3D view
 ```
 
 ## Demo script
