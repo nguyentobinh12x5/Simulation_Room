@@ -34,3 +34,11 @@ def test_malformed_command_is_ignored():
     s = RoomState(hvac_on=True)
     assert handle_command(s, CMD_HVAC, b"not json").hvac_on is True
     assert handle_command(s, CMD_HVAC, b'{"command": "banana"}').hvac_on is True
+
+
+def test_non_object_json_command_is_ignored():
+    s = RoomState(hvac_on=True, occupancy=5)
+    assert handle_command(s, CMD_HVAC, b"null").hvac_on is True
+    assert handle_command(s, CMD_HVAC, b"5").hvac_on is True
+    assert handle_command(s, CMD_HVAC, b'"on"').hvac_on is True
+    assert handle_command(s, CMD_OCCUPANCY, b"[1, 2]").occupancy == 5

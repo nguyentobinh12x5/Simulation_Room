@@ -37,6 +37,8 @@ def handle_command(state: RoomState, topic: str, payload: bytes) -> RoomState:
         data = json.loads(payload)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return state
+    if not isinstance(data, dict):
+        return state
     if topic == CMD_HVAC:
         cmd = data.get("command")
         if cmd in ("on", "off"):
