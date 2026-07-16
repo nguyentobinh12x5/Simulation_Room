@@ -4,6 +4,7 @@ import threading
 from collections import deque
 from datetime import datetime
 
+import numpy as np
 import paho.mqtt.client as mqtt
 import plotly.graph_objects as go
 import streamlit as st
@@ -66,6 +67,16 @@ client, store = get_mqtt()
 if "alert_on" not in st.session_state:
     st.session_state.alert_on = False
 
+with st.sidebar:
+    st.header("Điều khiển")
+    col_on, col_off = st.columns(2)
+    if col_on.button("❄️ AC ON", use_container_width=True):
+        client.publish(f"{BASE}/cmd/hvac", json.dumps({"command": "on"}))
+    if col_off.button("AC OFF", use_container_width=True):
+        client.publish(f"{BASE}/cmd/hvac", json.dumps({"command": "off"}))
+    st.caption("Trạng thái AC lấy từ twin/room1/hvac/state — "
+               "là trạng thái simulator xác nhận, không phải trạng thái nút.")
+
 
 @st.fragment(run_every=1.0)
 def live_view():
@@ -90,6 +101,12 @@ def live_view():
     c2.metric("💧 Humidity", f"{hum:.1f} %" if hum is not None else "—")
     c3.metric("👥 Occupancy", f"{occ} người" if occ is not None else "—")
 
+    hvac = store["hvac_on"]
+    if hvac is None:
+        st.caption("AC: chưa rõ (chưa nhận state)")
+    else:
+        st.markdown(f"**AC:** {'🟢 ON' if hvac else '⚪ OFF'}")
+
     with store["lock"]:
         points = list(store["temperature"])
     if points:
@@ -102,6 +119,21 @@ def live_view():
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Đang chờ dữ liệu từ simulator…")
+
+    # Du bao: fit bac 1 qua 60s gan nhat, uoc luong thoi gian cham 30°C
+    if len(points) >= 5:
+        now = xs[-1]
+        recent = [(x, y) for x, y in points if (now - x).total_seconds() <= 60]
+        if len(recent) >= 5:
+            t0 = recent[0][0]
+            sec = np.array([(x - t0).total_seconds() for x, _ in recent])
+            vals = np.array([y for _, y in recent])
+            slope, intercept = np.polyfit(sec, vals, 1)
+            if slope > 0.001 and vals[-1] < ALERT_ON:
+                eta = (ALERT_ON - vals[-1]) / slope
+                if eta < 300:
+                    st.warning(f"📈 Dự báo chạm {ALERT_ON}°C sau ~{eta:.0f}s "
+                               f"(tốc độ +{slope*60:.2f}°C/phút)")
 
 
 live_view()
