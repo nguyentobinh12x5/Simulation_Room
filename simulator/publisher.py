@@ -1,4 +1,10 @@
-"""Simulator: publish sensor data va nhan lenh dieu khien nguoc (closed-loop)."""
+"""Simulator: publish sensor data and receive control commands (closed-loop).
+
+Upgraded with:
+- Variable-speed AC (0-100% power via PID controller)
+- Configurable setpoint and time scale
+- Occupancy up to 30 people
+"""
 import json
 import random
 import time
@@ -7,19 +13,27 @@ from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 
-from physics import (OCC_MAX, OCC_MIN, RoomState, clamp, step_humidity,
-                     step_occupancy, step_temperature)
+from physics import (OCC_MAX, OCC_MIN, RoomState, ac_output_temperature,
+                     clamp, step_humidity, step_occupancy, step_temperature)
+from pid_controller import PIDController
 
 BROKER_HOST = "localhost"
 BROKER_PORT = 1883
 BASE = "twin/room1"
 CMD_HVAC = f"{BASE}/cmd/hvac"
 CMD_OCCUPANCY = f"{BASE}/cmd/occupancy"
+CMD_SETPOINT = f"{BASE}/cmd/setpoint"
+CMD_TIMESCALE = f"{BASE}/cmd/timescale"
 STATUS_TOPIC = f"{BASE}/status"
 HVAC_STATE_TOPIC = f"{BASE}/hvac/state"
+AC_DETAIL_TOPIC = f"{BASE}/ac/detail"
 
 INTERVALS = {"temperature": 3, "humidity": 5, "occupancy": 2}
 NOISE = 0.1
+
+# Valid time scale values
+VALID_TIME_SCALES = {1, 2, 5, 10}
+SETPOINT_MIN, SETPOINT_MAX = 18.0, 30.0
 
 
 def utc_now_iso() -> str:
@@ -32,7 +46,7 @@ def make_payload(sensor: str, value, unit: str, timestamp: str | None = None) ->
 
 
 def handle_command(state: RoomState, topic: str, payload: bytes) -> RoomState:
-    """Ap lenh dieu khien vao state; lenh hong thi bo qua, state giu nguyen."""
+    """Apply control command to state; malformed commands are ignored."""
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -47,6 +61,16 @@ def handle_command(state: RoomState, topic: str, payload: bytes) -> RoomState:
         v = data.get("value")
         if isinstance(v, int) and not isinstance(v, bool):
             return replace(state, occupancy=clamp(v, OCC_MIN, OCC_MAX))
+    elif topic == CMD_SETPOINT:
+        v = data.get("value")
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return replace(state, setpoint=clamp(float(v), SETPOINT_MIN, SETPOINT_MAX))
+    elif topic == CMD_TIMESCALE:
+        v = data.get("value")
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            v = int(v)
+            if v in VALID_TIME_SCALES:
+                return replace(state, time_scale=float(v))
     return state
 
 
@@ -54,29 +78,59 @@ class Simulator:
     def __init__(self):
         self.state = RoomState()
         self.rng = random.Random()
+        self.pid = PIDController()
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.will_set(STATUS_TOPIC, "offline", retain=True)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
-        client.subscribe([(CMD_HVAC, 0), (CMD_OCCUPANCY, 0)])
+        client.subscribe([
+            (CMD_HVAC, 0), (CMD_OCCUPANCY, 0),
+            (CMD_SETPOINT, 0), (CMD_TIMESCALE, 0),
+        ])
         client.publish(STATUS_TOPIC, "online", retain=True)
         self.publish_hvac_state()
+        self.publish_ac_detail()
         print("connected, subscribed to cmd topics")
 
     def on_message(self, client, userdata, msg):
-        before = self.state.hvac_on
+        before_hvac = self.state.hvac_on
         self.state = handle_command(self.state, msg.topic, msg.payload)
         print(f"cmd {msg.topic}: {msg.payload!r} -> hvac_on={self.state.hvac_on}, "
-              f"occupancy={self.state.occupancy}")
-        if self.state.hvac_on != before:
+              f"occupancy={self.state.occupancy}, setpoint={self.state.setpoint}, "
+              f"time_scale={self.state.time_scale}")
+
+        # Reset PID when HVAC is turned off
+        if before_hvac and not self.state.hvac_on:
+            self.pid.reset()
+            self.state = replace(self.state, ac_power_pct=0.0)
+
+        if self.state.hvac_on != before_hvac:
             self.publish_hvac_state()
+            self.publish_ac_detail()
 
     def publish_hvac_state(self):
         self.client.publish(HVAC_STATE_TOPIC,
-                            json.dumps({"hvac_on": self.state.hvac_on,
-                                        "timestamp": utc_now_iso()}),
+                            json.dumps({
+                                "hvac_on": self.state.hvac_on,
+                                "ac_power_pct": round(self.state.ac_power_pct, 2),
+                                "setpoint": self.state.setpoint,
+                                "timestamp": utc_now_iso(),
+                            }),
+                            retain=True)
+
+    def publish_ac_detail(self):
+        ac_temp = ac_output_temperature(self.state.ac_power_pct)
+        mode = "auto" if self.state.hvac_on else "off"
+        self.client.publish(AC_DETAIL_TOPIC,
+                            json.dumps({
+                                "ac_power_pct": round(self.state.ac_power_pct, 2),
+                                "ac_temp_output": round(ac_temp, 1),
+                                "setpoint": self.state.setpoint,
+                                "mode": mode,
+                                "timestamp": utc_now_iso(),
+                            }),
                             retain=True)
 
     def publish_sensor(self, sensor: str):
@@ -87,26 +141,47 @@ class Simulator:
         else:
             value, unit = self.state.occupancy, "people"
         self.client.publish(f"{BASE}/{sensor}", make_payload(sensor, value, unit), retain=True)
-        print(f"{sensor}={value}{unit} hvac={'on' if self.state.hvac_on else 'off'}")
+        ac_pct_display = round(self.state.ac_power_pct * 100)
+        print(f"{sensor}={value}{unit} hvac={'on' if self.state.hvac_on else 'off'} "
+              f"ac_power={ac_pct_display}% setpoint={self.state.setpoint}°C "
+              f"x{int(self.state.time_scale)}")
 
     def run(self):
         self.client.connect(BROKER_HOST, BROKER_PORT)
-        self.client.loop_start()  # cmd xu ly o thread rieng cua paho
+        self.client.loop_start()  # cmd processing on paho's separate thread
         tick = 0
         try:
             while True:
-                # physics tien 1 giay moi tick, khong phu thuoc chu ky publish
+                # Apply time_scale: each tick simulates time_scale seconds of physics
+                dt = self.state.time_scale
+
+                # PID controller: auto-adjust AC power when HVAC is on
+                if self.state.hvac_on:
+                    new_pct = self.pid.compute(
+                        self.state.temperature, self.state.setpoint, dt
+                    )
+                    self.state = replace(self.state, ac_power_pct=new_pct)
+
+                # Advance physics by dt seconds
                 self.state = replace(
                     self.state,
-                    temperature=step_temperature(self.state, dt=1.0),
-                    humidity=step_humidity(self.state, dt=1.0),
+                    temperature=step_temperature(self.state, dt=dt),
+                    humidity=step_humidity(self.state, dt=dt),
                 )
                 if tick % INTERVALS["occupancy"] == 0:
                     self.state = replace(self.state,
                                          occupancy=step_occupancy(self.state, self.rng))
+
+                # Publish sensors and AC details at regular intervals
                 for sensor, interval in INTERVALS.items():
                     if tick % interval == 0:
                         self.publish_sensor(sensor)
+
+                # Publish AC detail every 2 ticks when HVAC is running
+                if self.state.hvac_on and tick % 2 == 0:
+                    self.publish_hvac_state()
+                    self.publish_ac_detail()
+
                 tick += 1
                 time.sleep(1)
         except KeyboardInterrupt:
