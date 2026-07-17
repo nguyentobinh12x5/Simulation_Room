@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --sans: "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif;
+        --mono: "SF Mono", "JetBrains Mono", Menlo, monospace;
+        --bg0: #0a0f1c;
+        --panel: rgba(17, 26, 43, 0.82);
+        --hair: #1f3350;
+        --cyan: #38e1c8;
+        --blue: #4c8dff;
+        --cool: #3fa9ff;
+        --heat: #ff6b4a;
+        --amber: #ffb020;
+        --green: #35d6a4;
+        --ink: #eaf2ff;
+        --muted: #8ea3c4;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #000; }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: var(--sans);
+        color: var(--ink);
+      }
+      /* Continuous background lives on a full-bleed child, never the root. */
+      #bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(1200px 800px at 22% 12%, #14213a 0%, rgba(20,33,58,0) 60%),
+          radial-gradient(1100px 900px at 88% 90%, #101a2e 0%, rgba(16,26,46,0) 55%),
+          var(--bg0);
+      }
+      #bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(rgba(56,225,200,0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(56,225,200,0.05) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(1400px 900px at 50% 45%, #000 0%, transparent 80%);
+      }
+      .scene { position: absolute; inset: 0; }
+      .inner { position: absolute; inset: 0; }
+
+      /* Persistent chrome inside each scene */
+      .kicker {
+        position: absolute;
+        left: 80px; top: 54px;
+        z-index: 6;
+        font-family: var(--mono);
+        font-size: 20px;
+        letter-spacing: 4px;
+        color: var(--cyan);
+        text-transform: uppercase;
+      }
+      .kicker .dot { color: var(--muted); }
+      .stamp {
+        position: absolute;
+        right: 80px; top: 54px;
+        font-family: var(--mono);
+        font-size: 18px;
+        letter-spacing: 2px;
+        color: var(--muted);
+      }
+      .stamp b { color: var(--cyan); font-weight: 600; }
+
+      /* Left rail */
+      .rail { position: absolute; left: 80px; top: 236px; width: 312px; }
+      .rail .num {
+        font-family: var(--mono);
+        font-size: 22px;
+        color: var(--blue);
+        letter-spacing: 3px;
+      }
+      .rail h2 {
+        margin: 10px 0 22px;
+        font-size: 52px;
+        line-height: 1.04;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+      .rail .accent-tick {
+        width: 64px; height: 5px; border-radius: 3px;
+        background: linear-gradient(90deg, var(--cyan), var(--blue));
+        margin-bottom: 26px;
+      }
+      .rail ul { list-style: none; margin: 0; padding: 0; }
+      .rail li {
+        display: flex; align-items: flex-start; gap: 14px;
+        font-size: 25px; line-height: 1.34; color: var(--ink);
+        margin-bottom: 20px; font-weight: 500;
+      }
+      .rail li .b {
+        flex: 0 0 auto; margin-top: 11px;
+        width: 10px; height: 10px; border-radius: 3px;
+        background: var(--cyan);
+        box-shadow: 0 0 12px rgba(56,225,200,0.7);
+      }
+      .rail li.heat .b { background: var(--heat); box-shadow: 0 0 12px rgba(255,107,74,0.7); }
+      .rail li.blue .b { background: var(--blue); box-shadow: 0 0 12px rgba(76,141,255,0.7); }
+      .rail li.green .b { background: var(--green); box-shadow: 0 0 12px rgba(53,214,164,0.7); }
+      .rail .chip {
+        display: inline-flex; align-items: center; gap: 10px;
+        margin-top: 6px; padding: 12px 16px;
+        border: 1px solid var(--hair); border-radius: 12px;
+        background: rgba(10,15,28,0.7);
+        font-family: var(--mono); font-size: 19px; color: var(--cyan);
+      }
+      .rail .chip .k { color: var(--muted); }
+
+      /* Device frame holding the screenshot */
+      .device {
+        position: absolute;
+        left: 436px; top: 96px;
+        width: 1420px; height: 888px;
+        border-radius: 22px;
+        border: 1px solid var(--hair);
+        background: #0c1322;
+        overflow: hidden;
+        box-shadow: 0 40px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(56,225,200,0.06);
+      }
+      .device .bar {
+        position: absolute; left: 0; top: 0; right: 0; height: 38px;
+        display: flex; align-items: center; gap: 9px; padding: 0 16px;
+        background: linear-gradient(180deg, #0f1a2e, #0b1424);
+        border-bottom: 1px solid var(--hair);
+        z-index: 3;
+      }
+      .device .bar i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+      .device .bar .r { background: #ff5f56; } .device .bar .y { background: #ffbd2e; } .device .bar .g { background: #27c93f; }
+      .device .bar .url {
+        margin-left: 14px; font-family: var(--mono); font-size: 16px; color: var(--muted);
+      }
+      .shot-kb { position: absolute; left: 0; top: 38px; right: 0; bottom: 0; transform-origin: 50% 50%; }
+      .shot { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .vignette {
+        position: absolute; inset: 38px 0 0 0; pointer-events: none; z-index: 2;
+        box-shadow: inset 0 0 120px rgba(4,8,16,0.55);
+      }
+
+      /* Callouts (inside shot-kb so they track the image) */
+      .callout {
+        position: absolute; z-index: 4;
+        border: 3px solid var(--cyan); border-radius: 14px;
+        box-shadow: 0 0 0 2px rgba(56,225,200,0.15), 0 0 26px rgba(56,225,200,0.45);
+        transform-origin: 50% 50%;
+      }
+      .callout.heat { border-color: var(--heat); box-shadow: 0 0 0 2px rgba(255,107,74,0.18), 0 0 26px rgba(255,107,74,0.5); }
+      .callout.green { border-color: var(--green); box-shadow: 0 0 0 2px rgba(53,214,164,0.18), 0 0 26px rgba(53,214,164,0.5); }
+      .callout.blue { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(76,141,255,0.18), 0 0 26px rgba(76,141,255,0.5); }
+      .tag {
+        position: absolute; z-index: 5;
+        padding: 8px 14px; border-radius: 10px;
+        background: rgba(9,14,26,0.92); border: 1px solid var(--hair);
+        font-family: var(--mono); font-size: 18px; color: var(--cyan);
+        white-space: nowrap; transform-origin: 50% 100%;
+      }
+      .tag.heat { color: var(--heat); } .tag.green { color: var(--green); } .tag.blue { color: var(--blue); }
+
+      /* ---------- Intro title (s1) ---------- */
+      #s1 .title-wrap { position: absolute; left: 80px; top: 236px; width: 1760px; }
+      #s1 .eyebrow {
+        font-family: var(--mono); font-size: 24px; letter-spacing: 8px;
+        color: var(--cyan); text-transform: uppercase; margin-bottom: 22px;
+      }
+      #s1 h1 {
+        margin: 0; font-size: 128px; font-weight: 800; line-height: 0.98;
+        letter-spacing: -2px;
+      }
+      #s1 h1 .accent { background: linear-gradient(90deg, var(--cyan), var(--cool)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      #s1 .sub { margin-top: 26px; font-size: 34px; color: var(--muted); font-weight: 500; }
+
+      #s1 .sensors { position: absolute; left: 80px; top: 620px; width: 1760px; display: flex; gap: 30px; }
+      #s1 .scard {
+        flex: 1; border: 1px solid var(--hair); border-radius: 18px;
+        background: var(--panel); padding: 34px 36px; transform-origin: 50% 50%;
+      }
+      #s1 .scard .ic { font-size: 42px; line-height: 1; }
+      #s1 .scard .lbl { font-size: 34px; font-weight: 700; margin-top: 18px; }
+      #s1 .scard .desc { font-family: var(--mono); font-size: 20px; color: var(--muted); margin-top: 12px; }
+      #s1 .scard.temp { border-color: rgba(255,107,74,0.35); }
+      #s1 .scard.hum { border-color: rgba(63,169,255,0.35); }
+      #s1 .scard.occ { border-color: rgba(56,225,200,0.35); }
+      #s1 .streamnote {
+        position: absolute; left: 80px; top: 908px;
+        font-family: var(--mono); font-size: 22px; color: var(--muted); letter-spacing: 1px;
+      }
+      #s1 .streamnote b { color: var(--cyan); font-weight: 600; }
+
+      /* ---------- Intro architecture (s1b) ---------- */
+      #s1b .head { position: absolute; left: 80px; top: 150px; width: 1760px; }
+      #s1b .eyebrow {
+        font-family: var(--mono); font-size: 22px; letter-spacing: 6px;
+        color: var(--cyan); text-transform: uppercase; margin-bottom: 18px;
+      }
+      #s1b h2 { margin: 0; font-size: 76px; font-weight: 800; letter-spacing: -1px; line-height: 1.02; }
+      #s1b h2 .accent { background: linear-gradient(90deg, var(--cyan), var(--cool)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      #s1b .subnote { margin-top: 22px; font-size: 30px; color: var(--muted); font-weight: 500; max-width: 1500px; }
+      #s1b .subnote b { color: var(--ink); font-weight: 600; }
+
+      #s1b .pipe { position: absolute; left: 80px; top: 640px; width: 1760px; height: 240px; }
+      #s1b .node {
+        position: absolute; top: 40px; width: 340px; height: 138px;
+        border: 1px solid var(--hair); border-radius: 16px;
+        background: var(--panel);
+        display: flex; flex-direction: column; justify-content: center; padding: 0 26px;
+        transform-origin: 50% 50%;
+      }
+      #s1b .node .t { font-size: 28px; font-weight: 700; }
+      #s1b .node .d { font-family: var(--mono); font-size: 16px; color: var(--muted); margin-top: 8px; }
+      #s1b .node.n1 { left: 0; border-color: rgba(56,225,200,0.4); }
+      #s1b .node.n2 { left: 710px; }
+      #s1b .node.n3 { left: 1420px; }
+      #s1b .node .badge {
+        position: absolute; right: -12px; top: -14px;
+        font-family: var(--mono); font-size: 14px; padding: 6px 11px;
+        border-radius: 8px; background: var(--cyan); color: #04241f; font-weight: 700;
+      }
+      #s1b .link { position: absolute; top: 108px; height: 3px; background: linear-gradient(90deg, rgba(56,225,200,0.15), rgba(56,225,200,0.55)); transform-origin: left center; }
+      #s1b .link.l1 { left: 340px; width: 370px; }
+      #s1b .link.l2 { left: 1050px; width: 370px; }
+      #s1b .flowlabel { position: absolute; top: 60px; font-family: var(--mono); font-size: 16px; color: var(--cyan); }
+      #s1b .flowlabel.f1 { left: 430px; } #s1b .flowlabel.f2 { left: 1140px; }
+      #s1b .packet { position: absolute; top: 102px; left: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 16px var(--cyan); }
+      #s1b .retlink { position: absolute; top: 200px; left: 170px; width: 1420px; height: 3px; background: repeating-linear-gradient(90deg, rgba(76,141,255,0.6) 0 12px, transparent 12px 24px); transform-origin: right center; }
+      #s1b .retlabel { position: absolute; top: 214px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 17px; color: var(--blue); }
+      #s1b .retpulse { position: absolute; top: 194px; left: 170px; width: 15px; height: 15px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 16px var(--blue); }
+
+      /* ---------- Outro (s9) ---------- */
+      #s9 .scrim { position: absolute; inset: 0; background: radial-gradient(1200px 800px at 50% 40%, rgba(10,15,28,0.72), rgba(10,15,28,0.94)); z-index: 3; }
+      #s9 .recap { position: absolute; left: 50%; top: 214px; transform: translateX(-50%); width: 1360px; text-align: center; z-index: 4; }
+      #s9 .recap .eyebrow { font-family: var(--mono); font-size: 22px; letter-spacing: 6px; color: var(--cyan); text-transform: uppercase; }
+      #s9 .recap h2 { margin: 16px 0 40px; font-size: 66px; font-weight: 800; letter-spacing: -1px; }
+      #s9 .pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+      #s9 .pillar {
+        border: 1px solid var(--hair); border-radius: 16px; background: var(--panel);
+        padding: 26px 28px; text-align: left; transform-origin: 50% 50%;
+      }
+      #s9 .pillar .t { font-size: 28px; font-weight: 700; }
+      #s9 .pillar .d { font-size: 21px; color: var(--muted); margin-top: 8px; line-height: 1.3; }
+      #s9 .pillar .ic { font-family: var(--mono); font-size: 18px; color: var(--cyan); }
+      #s9 .thanks { margin-top: 44px; font-size: 40px; font-weight: 700; }
+      #s9 .thanks .accent { background: linear-gradient(90deg, var(--cyan), var(--cool)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="root" data-start="0" data-width="1920" data-height="1080" data-duration="217">
+      <div id="bg"></div>
+
+      <!-- ============ S1 · INTRO TITLE ============ -->
+      <section id="s1" class="scene clip" data-start="0" data-duration="20.5" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">ROOM 1 <b>ONLINE</b></div>
+          <div class="title-wrap">
+            <div class="eyebrow">Real-time laboratory digital twin</div>
+            <h1>Smart Lab <span class="accent">Digital Twin</span></h1>
+            <div class="sub">A physics simulator models a live laboratory room in real time.</div>
+          </div>
+          <div class="sensors">
+            <div class="scard temp"><div class="ic">🌡</div><div class="lbl">Temperature</div><div class="desc">published every 3s</div></div>
+            <div class="scard hum"><div class="ic">💧</div><div class="lbl">Humidity</div><div class="desc">published every 5s</div></div>
+            <div class="scard occ"><div class="ic">👥</div><div class="lbl">Occupancy</div><div class="desc">published every 2s</div></div>
+          </div>
+          <div class="streamnote">streamed over <b>MQTT</b> → Streamlit dashboard <b>+</b> Three.js 3D view</div>
+        </div>
+      </section>
+
+      <!-- ============ S1b · INTRO ARCHITECTURE ============ -->
+      <section id="s1b" class="scene clip" data-start="20.5" data-duration="17" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">ARCHITECTURE</div>
+          <div class="head">
+            <div class="eyebrow">A true digital twin — not a shadow</div>
+            <h2>Commands flow back — <span class="accent">closing the loop</span></h2>
+            <div class="subnote">The dashboard publishes commands to the simulator, and a <b>PID controller</b> auto-regulates the AC power to hold any target temperature.</div>
+          </div>
+          <div class="pipe">
+            <div class="node n1"><div class="t">Simulator</div><div class="d">physics + PID</div><div class="badge">PID</div></div>
+            <div class="node n2"><div class="t">MQTT Broker</div><div class="d">Mosquitto · pub / sub</div></div>
+            <div class="node n3"><div class="t">Dashboard + 3D</div><div class="d">Streamlit · Three.js</div></div>
+            <div class="flowlabel f1">telemetry →</div>
+            <div class="flowlabel f2">telemetry →</div>
+            <div class="link l1"></div>
+            <div class="link l2"></div>
+            <div class="packet p1"></div>
+            <div class="packet p2"></div>
+            <div class="retlink"></div>
+            <div class="retlabel">← commands · twin/room1/cmd/…</div>
+            <div class="retpulse"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S2 · DASHBOARD TOUR ============ -->
+      <section id="s2" class="scene clip" data-start="37.5" data-duration="28" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">02 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">02</div>
+            <h2>The Dashboard</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li><span class="b"></span>Live metrics, updated over MQTT</li>
+              <li><span class="b"></span>HVAC status &amp; AC power %</li>
+              <li><span class="b"></span>Trend chart + predictive alert</li>
+              <li><span class="b"></span>Inline 3D room view</li>
+            </ul>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8501 — Smart Lab Digital Twin</span></div>
+            <div class="shot-kb"><img class="shot" src="assets/shots/demo_01_dashboard_overview.png" alt="dashboard" /></div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S3 · THE PROBLEM ============ -->
+      <section id="s3" class="scene clip" data-start="65.5" data-duration="22" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">03 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">03</div>
+            <h2>The Problem</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li class="heat"><span class="b"></span>27 occupants ≈ 2.7 kW heat load</li>
+              <li class="heat"><span class="b"></span>AC off → temperature climbs</li>
+              <li class="heat"><span class="b"></span>Predictive overheat alert fires</li>
+            </ul>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8501 — 40.0°C · overheating</span></div>
+            <div class="shot-kb">
+              <img class="shot" src="assets/shots/demo_02_overheating_alert.png" alt="overheating" />
+              <div class="callout heat" style="left:2.5%; top:14%; width:41%; height:12%;"></div>
+              <div class="tag heat" style="left:2.5%; top:6%;">⚠ OVERHEATING · 40.0°C</div>
+            </div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S4 · PID FULL POWER ============ -->
+      <section id="s4" class="scene clip" data-start="87.5" data-duration="22.5" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">04 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">04</div>
+            <h2>PID Control</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li><span class="b"></span>error = room − setpoint</li>
+              <li><span class="b"></span>Power modulates 0–100% (3.5 kW)</li>
+              <li><span class="b"></span>Large error → full power</li>
+            </ul>
+            <div class="chip"><span class="k">setpoint</span> 22.0°C</div>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8501 — AC ON · 100%</span></div>
+            <div class="shot-kb">
+              <img class="shot" src="assets/shots/demo_03_pid_full_power.png" alt="pid full power" />
+              <div class="callout" style="left:50%; top:31%; width:48%; height:34%;"></div>
+              <div class="tag" style="left:50%; top:23%;">⚡ AC Power · 100%</div>
+            </div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S5 · LOCKED AT SETPOINT ============ -->
+      <section id="s5" class="scene clip" data-start="110" data-duration="21.5" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">05 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">05</div>
+            <h2>Locked on Setpoint</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li class="green"><span class="b"></span>Holds exactly 22.0°C</li>
+              <li class="green"><span class="b"></span>Integral eliminates offset</li>
+              <li class="green"><span class="b"></span>Derivative damps overshoot</li>
+            </ul>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8501 — 22.0°C · steady</span></div>
+            <div class="shot-kb">
+              <img class="shot" src="assets/shots/demo_04_locked_at_setpoint.png" alt="locked" />
+              <div class="callout green" style="left:2.5%; top:20%; width:20%; height:24%;"></div>
+              <div class="tag green" style="left:2.5%; top:12%;">🌡 22.0°C · on target</div>
+            </div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S6 · FEEDBACK LOOP ============ -->
+      <section id="s6" class="scene clip" data-start="131.5" data-duration="20" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">06 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">06</div>
+            <h2>Closed Loop</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li class="blue"><span class="b"></span>Dashboard → MQTT command</li>
+              <li class="blue"><span class="b"></span>Simulator applies &amp; confirms</li>
+              <li class="blue"><span class="b"></span>A true twin, not a shadow</li>
+            </ul>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8501 — setpoint → 25.0°C</span></div>
+            <div class="shot-kb">
+              <img class="shot" src="assets/shots/demo_05_setpoint_change_reaction.png" alt="feedback" />
+              <div class="callout blue" style="left:2.5%; top:41%; width:30%; height:16%;"></div>
+              <div class="tag blue" style="left:2.5%; top:33%;">🎛 control → cmd/setpoint</div>
+            </div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S7 · 3D VIEW ============ -->
+      <section id="s7" class="scene clip" data-start="151.5" data-duration="21.5" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">07 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">07</div>
+            <h2>The 3D Twin</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li><span class="b"></span>Three.js, in the browser</li>
+              <li><span class="b"></span>WebSockets — no extra backend</li>
+              <li><span class="b"></span>Floor color = temperature</li>
+            </ul>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8000 — 3D room view</span></div>
+            <div class="shot-kb"><img class="shot" src="assets/shots/demo_06_3d_room_view.png" alt="3d" /></div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S8 · MQTT / RESILIENCE ============ -->
+      <section id="s8" class="scene clip" data-start="173" data-duration="21" data-track-index="1">
+        <div class="inner">
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="stamp">08 <b>/ 09</b></div>
+          <div class="rail">
+            <div class="num">08</div>
+            <h2>Open &amp; Resilient</h2>
+            <div class="accent-tick"></div>
+            <ul>
+              <li><span class="b"></span>Any client can join via MQTT</li>
+              <li><span class="b"></span>CLI raises occupancy → 29</li>
+              <li><span class="b"></span>LWT marks the twin offline</li>
+            </ul>
+            <div class="chip"><span class="k">$</span> mosquitto_pub&nbsp;·&nbsp;cmd/occupancy</div>
+          </div>
+          <div class="device">
+            <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="url">localhost:8501 — occupancy → 29</span></div>
+            <div class="shot-kb">
+              <img class="shot" src="assets/shots/demo_07_mqtt_cli_reaction.png" alt="mqtt cli" />
+              <div class="callout" style="left:2.5%; top:20%; width:41%; height:24%;"></div>
+              <div class="tag" style="left:2.5%; top:12%;">👥 occupancy · 29</div>
+            </div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ S9 · RECAP / OUTRO ============ -->
+      <section id="s9" class="scene clip" data-start="194" data-duration="23" data-track-index="1">
+        <div class="inner">
+          <div class="shot-kb" style="position:absolute; inset:0;"><img class="shot" src="assets/shots/demo_08_wrapup_steady_state.png" alt="steady" style="object-fit:cover; filter:saturate(0.9);" /></div>
+          <div class="scrim"></div>
+          <div class="kicker">SMART LAB <span class="dot">·</span> DIGITAL TWIN</div>
+          <div class="recap">
+            <div class="eyebrow">The complete system</div>
+            <h2>A real-time digital twin</h2>
+            <div class="pillars">
+              <div class="pillar"><div class="ic">01 · SIM</div><div class="t">Physics room simulator</div><div class="d">Temperature, humidity &amp; occupancy dynamics</div></div>
+              <div class="pillar"><div class="ic">02 · MQTT</div><div class="t">Event-driven messaging</div><div class="d">Retained state · Last Will &amp; Testament</div></div>
+              <div class="pillar"><div class="ic">03 · VIEW</div><div class="t">Dashboard + 3D twin</div><div class="d">Live metrics, charts &amp; WebGL room</div></div>
+              <div class="pillar"><div class="ic">04 · PID</div><div class="t">Closed-loop control</div><div class="d">Auto-regulated HVAC to any setpoint</div></div>
+            </div>
+            <div class="thanks">Thanks for <span class="accent">watching</span>.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ NARRATION (root-child audio) ============ -->
+      <audio id="a1"  src="assets/audio/s1.wav"  data-start="0.4"   data-duration="18.9"  data-track-index="10" data-volume="1"></audio>
+      <audio id="a1b" src="assets/audio/s1b.wav" data-start="20.9"  data-duration="15.1"  data-track-index="10" data-volume="1"></audio>
+      <audio id="a2"  src="assets/audio/s2.wav"  data-start="37.9"  data-duration="26.7"  data-track-index="10" data-volume="1"></audio>
+      <audio id="a3"  src="assets/audio/s3.wav"  data-start="65.9"  data-duration="20.22" data-track-index="10" data-volume="1"></audio>
+      <audio id="a4"  src="assets/audio/s4.wav"  data-start="87.9"  data-duration="20.95" data-track-index="10" data-volume="1"></audio>
+      <audio id="a5"  src="assets/audio/s5.wav"  data-start="110.4" data-duration="19.65" data-track-index="10" data-volume="1"></audio>
+      <audio id="a6"  src="assets/audio/s6.wav"  data-start="131.9" data-duration="18.5"  data-track-index="10" data-volume="1"></audio>
+      <audio id="a7"  src="assets/audio/s7.wav"  data-start="151.9" data-duration="19.84" data-track-index="10" data-volume="1"></audio>
+      <audio id="a8"  src="assets/audio/s8.wav"  data-start="173.4" data-duration="19.52" data-track-index="10" data-volume="1"></audio>
+      <audio id="a9"  src="assets/audio/s9.wav"  data-start="194.4" data-duration="20.61" data-track-index="10" data-volume="1"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // Scene windows (global time): [start, duration].
+      const SC = {
+        s1: [0, 20.5], s1b: [20.5, 17], s2: [37.5, 28], s3: [65.5, 22], s4: [87.5, 22.5],
+        s5: [110, 21.5], s6: [131.5, 20], s7: [151.5, 21.5], s8: [173, 21], s9: [194, 23],
+      };
+
+      // Common per-scene fade + ken-burns for screenshot scenes.
+      function scene(id, kb) {
+        const [start, dur] = SC[id];
+        tl.fromTo("#" + id + " .inner", { autoAlpha: 0, y: 22 },
+          { autoAlpha: 1, y: 0, duration: 0.7, ease: "power2.out" }, start);
+        tl.to("#" + id + " .inner", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, start + dur - 0.45);
+        if (kb) {
+          const el = "#" + id + " .shot-kb";
+          gsap.set(el, { transformOrigin: kb.origin || "50% 50%" });
+          tl.fromTo(el, { scale: kb.from != null ? kb.from : 1.0 },
+            { scale: kb.to != null ? kb.to : 1.06, duration: dur, ease: "power1.inOut" }, start);
+        }
+      }
+
+      // Staggered rail bullets + optional chip.
+      function rail(id, at) {
+        const [start] = SC[id];
+        const items = gsap.utils.toArray("#" + id + " .rail li");
+        items.forEach((el, i) => {
+          tl.fromTo(el, { autoAlpha: 0, x: -18 },
+            { autoAlpha: 1, x: 0, duration: 0.5, ease: "power2.out" }, start + at + i * 0.5);
+        });
+        const chip = document.querySelector("#" + id + " .rail .chip");
+        if (chip) tl.fromTo(chip, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" }, start + at + items.length * 0.5 + 0.2);
+      }
+
+      function callout(id, at) {
+        const c = document.querySelector("#" + id + " .callout");
+        const t = document.querySelector("#" + id + " .tag");
+        const [start] = SC[id];
+        if (c) tl.fromTo(c, { scale: 0.6, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.55, ease: "power3.out" }, start + at);
+        if (t) tl.fromTo(t, { scale: 0.7, autoAlpha: 0, y: 8 }, { scale: 1, autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, start + at + 0.12);
+      }
+
+      /* ---------- S1 intro title + sensor cards ---------- */
+      (function () {
+        const [start, dur] = SC.s1;
+        tl.fromTo("#s1 .inner", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power2.out" }, start);
+        tl.to("#s1 .inner", { autoAlpha: 0, duration: 0.5, ease: "power2.in" }, start + dur - 0.5);
+        tl.fromTo("#s1 .eyebrow", { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power2.out" }, start + 0.3);
+        tl.fromTo("#s1 h1", { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0, duration: 0.9, ease: "power3.out" }, start + 0.5);
+        tl.fromTo("#s1 .sub", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power2.out" }, start + 1.1);
+        gsap.utils.toArray("#s1 .scard").forEach((el, i) => {
+          tl.fromTo(el, { autoAlpha: 0, y: 30, scale: 0.94 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.6, ease: "power3.out" }, start + 2.4 + i * 0.4);
+        });
+        tl.fromTo("#s1 .streamnote", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power2.out" }, start + 4.2);
+      })();
+
+      /* ---------- S1b intro architecture (closed-loop pipeline) ---------- */
+      (function () {
+        const [start, dur] = SC.s1b;
+        tl.fromTo("#s1b .inner", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power2.out" }, start);
+        tl.to("#s1b .inner", { autoAlpha: 0, duration: 0.5, ease: "power2.in" }, start + dur - 0.5);
+        tl.fromTo("#s1b .eyebrow", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power2.out" }, start + 0.3);
+        tl.fromTo("#s1b h2", { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.8, ease: "power3.out" }, start + 0.5);
+        tl.fromTo("#s1b .subnote", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power2.out" }, start + 1.0);
+        ["#s1b .n1", "#s1b .n2", "#s1b .n3"].forEach((n, i) => {
+          tl.fromTo(n, { autoAlpha: 0, scale: 0.7, y: 20 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.6, ease: "power3.out" }, start + 2.0 + i * 0.45);
+        });
+        tl.fromTo("#s1b .l1", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, start + 2.6);
+        tl.fromTo("#s1b .l2", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, start + 3.0);
+        tl.fromTo(["#s1b .f1", "#s1b .f2"], { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5, ease: "power2.out" }, start + 3.2);
+        tl.fromTo(["#s1b .retlink", "#s1b .retlabel"], { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power2.out" }, start + 3.7);
+        const flowStart = start + 3.2, flowEnd = start + dur - 1.0, cyc = 1.6;
+        const reps = Math.max(0, Math.floor((flowEnd - flowStart) / cyc) - 1);
+        tl.fromTo("#s1b .p1", { x: 340, autoAlpha: 0 }, { x: 700, autoAlpha: 1, duration: cyc, ease: "none", repeat: reps }, flowStart);
+        tl.fromTo("#s1b .p2", { x: 1050, autoAlpha: 0 }, { x: 1410, autoAlpha: 1, duration: cyc, ease: "none", repeat: reps }, flowStart + 0.5);
+        const rcyc = cyc * 1.3;
+        const rreps = Math.max(0, Math.floor((flowEnd - (flowStart + 1)) / rcyc) - 1);
+        tl.fromTo("#s1b .retpulse", { x: 1420, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: rcyc, ease: "none", repeat: rreps }, flowStart + 1.0);
+      })();
+
+      /* ---------- Screenshot scenes (gentle, readable ken-burns) ---------- */
+      scene("s2", { from: 1.0, to: 1.05, origin: "50% 42%" });
+      rail("s2", 0.9);
+
+      scene("s3", { from: 1.0, to: 1.055, origin: "36% 32%" });
+      rail("s3", 0.9);
+      callout("s3", 3.4);
+
+      scene("s4", { from: 1.0, to: 1.055, origin: "60% 42%" });
+      rail("s4", 0.9);
+      callout("s4", 6.5);
+
+      scene("s5", { from: 1.0, to: 1.055, origin: "36% 34%" });
+      rail("s5", 0.9);
+      callout("s5", 6.0);
+
+      scene("s6", { from: 1.0, to: 1.05, origin: "42% 56%" });
+      rail("s6", 0.9);
+      callout("s6", 2.4);
+
+      scene("s7", { from: 1.0, to: 1.06, origin: "55% 52%" });
+      rail("s7", 0.9);
+
+      scene("s8", { from: 1.0, to: 1.05, origin: "40% 34%" });
+      rail("s8", 0.9);
+      callout("s8", 5.0);
+
+      /* ---------- S9 outro ---------- */
+      (function () {
+        const [start, dur] = SC.s9;
+        tl.fromTo("#s9 .inner", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.7, ease: "power2.out" }, start);
+        gsap.set("#s9 .shot-kb", { transformOrigin: "50% 50%" });
+        tl.fromTo("#s9 .shot-kb", { scale: 1.08 }, { scale: 1.0, duration: dur, ease: "power1.inOut" }, start);
+        tl.fromTo("#s9 .recap .eyebrow", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power2.out" }, start + 0.5);
+        tl.fromTo("#s9 .recap h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power3.out" }, start + 0.8);
+        gsap.utils.toArray("#s9 .pillar").forEach((el, i) => {
+          tl.fromTo(el, { autoAlpha: 0, y: 26, scale: 0.94 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.6, ease: "power3.out" }, start + 1.5 + i * 0.55);
+        });
+        tl.fromTo("#s9 .thanks", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.8, ease: "power2.out" }, start + 4.2);
+        tl.to("#s9 .inner", { autoAlpha: 0, duration: 0.8, ease: "power2.in" }, start + dur - 0.9);
+      })();
+
+      window.__timelines["root"] = tl;
+    </script>
+  </body>
+</html>

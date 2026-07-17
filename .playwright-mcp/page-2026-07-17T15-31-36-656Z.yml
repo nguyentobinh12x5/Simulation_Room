@@ -1,0 +1,185 @@
+- generic [ref=f22e3]:
+  - banner [ref=f22e6]:
+    - generic [ref=f22e9]:
+      - button "Deploy" [ref=f22e11] [cursor=pointer]
+      - button "Main menu" [ref=f22e15] [cursor=pointer]
+  - generic [ref=f22e19]:
+    - heading "Smart Lab Digital Twin — Room 1" [level=2] [ref=f22e25]:
+      - text: Smart Lab Digital Twin — Room 1
+      - generic [ref=f22e26]:
+        - link "Link to heading":
+          - /url: "#smart-lab-digital-twin-room-1"
+    - generic [ref=f22e28]:
+      - generic [ref=f22e32]:
+        - heading "📊 Room Parameters" [level=3] [ref=f22e42]:
+          - text: 📊 Room Parameters
+          - generic [ref=f22e43]:
+            - link "Link to heading":
+              - /url: "#room-parameters"
+        - generic [ref=f22e47]:
+          - generic [ref=f22e52]:
+            - paragraph [ref=f22e55]: 🌡 Temperature
+            - paragraph [ref=f22e58]: 21.5 °C
+          - generic [ref=f22e63]:
+            - paragraph [ref=f22e66]: 💧 Humidity
+            - paragraph [ref=f22e69]: 80.0 %
+          - generic [ref=f22e74]:
+            - paragraph [ref=f22e77]: 👥 Occupants
+            - paragraph [ref=f22e80]: 19 people
+      - generic [ref=f22e84]:
+        - heading "❄️ HVAC Status" [level=3] [ref=f22e90]:
+          - text: ❄️ HVAC Status
+          - generic [ref=f22e91]:
+            - link "Link to heading":
+              - /url: "#hvac-status"
+        - generic [ref=f22e93]:
+          - generic [ref=f22e98]:
+            - paragraph [ref=f22e101]: AC
+            - paragraph [ref=f22e104]: 🟢 ON
+          - generic [ref=f22e109]:
+            - paragraph [ref=f22e112]: ⚡ AC Power
+            - paragraph [ref=f22e115]: 32%
+          - generic [ref=f22e120]:
+            - paragraph [ref=f22e123]: 🌬️ AC Vent Temp
+            - paragraph [ref=f22e126]: 24.2°C
+          - generic [ref=f22e131]:
+            - paragraph [ref=f22e134]: 🎯 Target
+            - paragraph [ref=f22e137]: 22.0°C
+    - generic [ref=f22e139]:
+      - heading "🎛️ Central Control Panel" [level=4] [ref=f22e145]:
+        - text: 🎛️ Central Control Panel
+        - generic [ref=f22e146]:
+          - link "Link to heading":
+            - /url: "#central-control-panel"
+      - generic [ref=f22e148]:
+        - generic [ref=f22e150]:
+          - paragraph [ref=f22e155]:
+            - strong [ref=f22e156]: AC Mode
+          - button [ref=f22e159] [cursor=pointer]:
+            - paragraph [ref=f22e163]: ❄️ AC ON
+          - button [ref=f22e166] [cursor=pointer]:
+            - paragraph [ref=f22e170]: AC OFF
+        - generic [ref=f22e172]:
+          - paragraph [ref=f22e177]:
+            - strong [ref=f22e178]: Target Temperature
+          - generic [ref=f22e181]:
+            - paragraph [ref=f22e185]: Setpoint (°C)
+            - group "Setpoint (°C)" [ref=f22e186]:
+              - generic [ref=f22e187]:
+                - generic [ref=f22e188]:
+                  - slider "Setpoint (°C) Setpoint (°C)" [ref=f22e190]: "25"
+                  - generic:
+                    - generic:
+                      - paragraph: "25.00"
+                - generic:
+                  - generic:
+                    - paragraph: "18.00"
+                  - generic:
+                    - paragraph: "30.00"
+          - button [ref=f22e193] [cursor=pointer]:
+            - paragraph [ref=f22e197]: Apply Setpoint
+        - generic [ref=f22e199]:
+          - paragraph [ref=f22e204]:
+            - strong [ref=f22e205]: Simulation Speed
+          - generic [ref=f22e208]:
+            - paragraph [ref=f22e212]: Time Multiplier
+            - group "Time Multiplier" [ref=f22e213]:
+              - generic [ref=f22e214]:
+                - generic [ref=f22e215]:
+                  - slider "Time Multiplier Time Multiplier" [ref=f22e217]: "0"
+                  - generic:
+                    - generic:
+                      - paragraph: x1
+                - generic:
+                  - generic:
+                    - paragraph: x1
+                  - generic:
+                    - paragraph: x10
+          - button [ref=f22e220] [cursor=pointer]:
+            - paragraph [ref=f22e224]: Apply Speed
+        - generic [ref=f22e226]:
+          - paragraph [ref=f22e231]:
+            - strong [ref=f22e232]: Occupancy Override
+          - generic [ref=f22e235]:
+            - paragraph [ref=f22e239]: Occupancy
+            - group "Occupancy" [ref=f22e240]:
+              - generic [ref=f22e241]:
+                - generic [ref=f22e242]:
+                  - slider "Occupancy Occupancy" [ref=f22e244]: "2"
+                  - generic:
+                    - generic:
+                      - paragraph: "2"
+                - generic:
+                  - generic:
+                    - paragraph: "0"
+                  - generic:
+                    - paragraph: "30"
+          - button [ref=f22e247] [cursor=pointer]:
+            - paragraph [ref=f22e251]: Apply Occupancy
+    - generic [ref=f22e253]:
+      - generic [ref=f22e257]:
+        - heading "📈 Temperature Trend" [level=3] [ref=f22e263]:
+          - text: 📈 Temperature Trend
+          - generic [ref=f22e264]:
+            - link "Link to heading":
+              - /url: "#temperature-trend"
+        - generic [ref=f22e270]:
+          - img:
+            - generic:
+              - generic:
+                - generic:
+                  - generic: 15:27:00Jul 17, 2026
+                  - generic: 15:27:30
+                  - generic: 15:28:00
+                  - generic: 15:28:30
+                  - generic: 15:29:00
+                  - generic: 15:29:30
+                  - generic: 15:30:00
+                  - generic: 15:30:30
+                  - generic: 15:31:00
+                - generic:
+                  - generic: "25"
+                  - generic: "30"
+                  - generic: "35"
+                  - generic: "40"
+          - img:
+            - generic:
+              - generic: °C
+              - generic: limit 30°C
+              - generic: setpoint 22.0°C
+          - toolbar [ref=f22e284]:
+            - button "Download plot as a PNG" [ref=f22e286] [cursor=pointer]
+            - generic [ref=f22e289]:
+              - button "Zoom" [ref=f22e290] [cursor=pointer]
+              - button "Pan" [ref=f22e293] [cursor=pointer]
+            - generic [ref=f22e296]:
+              - button "Zoom in" [ref=f22e297] [cursor=pointer]
+              - button "Zoom out" [ref=f22e300] [cursor=pointer]
+              - button "Autoscale" [ref=f22e303] [cursor=pointer]
+              - button "Reset axes" [ref=f22e306] [cursor=pointer]
+            - button "Fullscreen" [ref=f22e310] [cursor=pointer]
+      - generic [ref=f22e316]:
+        - heading "🧊 3D Room View" [level=3] [ref=f22e322]:
+          - text: 🧊 3D Room View
+          - generic [ref=f22e323]:
+            - link "Link to heading":
+              - /url: "#3-d-room-view"
+        - iframe [ref=f22e325]:
+          - generic [ref=f23e1]:
+            - generic:
+              - generic: 🏢 Smart Lab Digital Twin — 3D View
+              - generic:
+                - generic: "Room Temp:"
+                - generic: 21.5°C
+              - generic:
+                - generic: "Occupants:"
+                - generic: "19"
+              - generic:
+                - generic: "AC State:"
+                - generic: 🟢 ON
+              - generic:
+                - generic: "AC Power:"
+                - generic: 32%
+              - generic:
+                - generic: "Setpoint:"
+                - generic: 22.0°C

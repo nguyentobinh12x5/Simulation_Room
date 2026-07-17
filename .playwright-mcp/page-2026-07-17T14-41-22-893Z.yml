@@ -1,0 +1,18 @@
+- generic [active] [ref=f2e1]:
+  - generic:
+    - generic: 🏢 Smart Lab Digital Twin — 3D View
+    - generic:
+      - generic: "Room Temp:"
+      - generic: 25.1°C
+    - generic:
+      - generic: "Occupants:"
+      - generic: "3"
+    - generic:
+      - generic: "AC State:"
+      - generic: ⚪ OFF
+    - generic:
+      - generic: "AC Power:"
+      - generic: 0%
+    - generic:
+      - generic: "Setpoint:"
+      - generic: 25.0°C
