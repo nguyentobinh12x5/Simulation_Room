@@ -17,7 +17,7 @@ BROKER_HOST = "localhost"
 BROKER_PORT = 1883
 BASE = "twin/room1"
 SENSORS = ("temperature", "humidity", "occupancy")
-ALERT_ON, ALERT_OFF = 30.0, 29.5  # hysteresis to prevent flickering
+MANUAL_ALERT_ON, MANUAL_ALERT_OFF = 30.0, 29.5  # manual: fixed 30°C overheat (hysteresis)
 
 
 @st.cache_resource
@@ -129,12 +129,25 @@ with st.container(border=True):
     
     with ctrl_col1:
         st.markdown("**AC Mode**")
-        if st.button("❄️ AC ON", key="btn_on", width="stretch"):
-            client.publish(f"{BASE}/cmd/hvac", json.dumps({"command": "on"}))
-            st.toast("Sent AC ON command")
-        if st.button("AC OFF", key="btn_off", width="stretch"):
-            client.publish(f"{BASE}/cmd/hvac", json.dumps({"command": "off"}))
-            st.toast("Sent AC OFF command")
+        confirmed_mode = store["mode"] if store["mode"] in ("auto", "manual") else "manual"
+        mode_sel = st.radio(
+            "Control mode", ["Auto", "Manual"],
+            index=0 if confirmed_mode == "auto" else 1,
+            horizontal=True, key="mode_sel", label_visibility="collapsed",
+        )
+        desired_mode = mode_sel.lower()
+        if desired_mode != confirmed_mode:
+            client.publish(f"{BASE}/cmd/mode", json.dumps({"mode": desired_mode}))
+            st.toast(f"AC mode → {mode_sel}")
+        if desired_mode == "manual":
+            if st.button("❄️ AC ON", key="btn_on", width="stretch"):
+                client.publish(f"{BASE}/cmd/hvac", json.dumps({"command": "on"}))
+                st.toast("Sent AC ON command")
+            if st.button("AC OFF", key="btn_off", width="stretch"):
+                client.publish(f"{BASE}/cmd/hvac", json.dumps({"command": "off"}))
+                st.toast("Sent AC OFF command")
+        else:
+            st.caption("🤖 System controls the AC automatically.")
             
     with ctrl_col2:
         st.markdown("**Target Temperature**")
@@ -182,6 +195,32 @@ def live_view():
     ac_temp = store["ac_temp_output"]
     sp = store["setpoint"]
     status = store["status"]
+    mode = store["mode"] if store["mode"] in ("auto", "manual") else "manual"
+
+    # Warning logic is mode-dependent:
+    #   manual -> persistent banner at the fixed 30°C overheat ceiling (hysteresis)
+    #   auto   -> NO persistent banner; a single toast fires on each on/off event
+    if mode == "manual":
+        if temp is not None:
+            if temp > MANUAL_ALERT_ON:
+                st.session_state.alert_on = True
+            elif temp < MANUAL_ALERT_OFF:
+                st.session_state.alert_on = False
+        manual_overheat = st.session_state.alert_on and temp is not None
+        limit_line = MANUAL_ALERT_ON
+    else:  # auto
+        manual_overheat = False
+        limit_line = None
+
+    # Auto-mode notifications: one toast per auto on/off transition (edge-triggered)
+    prev_hvac = st.session_state.get("prev_hvac_on")
+    if mode == "auto" and hvac is not None and prev_hvac is not None and hvac != prev_hvac:
+        if hvac:
+            who = f"{occ} people, " if occ else ""
+            st.toast(f"⚠️ {who}above target {sp:.0f}°C — AC auto ON", icon="🔥")
+        else:
+            st.toast("Room empty — AC auto OFF", icon="❄️")
+    st.session_state.prev_hvac_on = hvac
 
     # 1. Update Top Left Box (Room status metrics)
     with top_left_box:
@@ -194,14 +233,10 @@ def live_view():
         if status == "offline":
             st.warning("Simulator offline — displaying last cached values.")
             
-        # Alert banner with hysteresis
-        if temp is not None:
-            if temp > ALERT_ON:
-                st.session_state.alert_on = True
-            elif temp < ALERT_OFF:
-                st.session_state.alert_on = False
-        if st.session_state.alert_on and temp is not None:
-            alert_placeholder.error(f"⚠️ OVERHEATING: {temp:.1f}°C (Threshold {ALERT_ON}°C)")
+        # Persistent overheat banner (manual mode only; auto uses toasts)
+        if manual_overheat:
+            alert_placeholder.error(
+                f"⚠️ OVERHEATING: {temp:.1f}°C (limit {MANUAL_ALERT_ON:.0f}°C)")
             
         c1, c2, c3 = st.columns(3)
         c1.metric("🌡 Temperature", f"{temp:.1f} °C" if temp is not None else "—")
@@ -211,7 +246,8 @@ def live_view():
     # 2. Update Top Right Box (AC status metrics)
     with top_right_box:
         st.markdown("### ❄️ HVAC Status")
-        h1, h2, h3, h4 = st.columns(4)
+        h0, h1, h2, h3, h4 = st.columns(5)
+        h0.metric("🤖 Mode", "Auto" if mode == "auto" else "Manual")
         if hvac is None:
             h1.metric("AC", "Unknown")
         else:
@@ -235,9 +271,10 @@ def live_view():
                 name="Room Temperature", line=dict(color="#3b82f6", width=2)
             ))
 
-            # Alert threshold line
-            fig.add_hline(y=ALERT_ON, line_dash="dash", line_color="red",
-                          annotation_text="limit 30°C")
+            # Overheat ceiling line (manual mode only; auto uses the target line)
+            if limit_line is not None:
+                fig.add_hline(y=limit_line, line_dash="dash", line_color="red",
+                              annotation_text=f"limit {limit_line:.0f}°C")
 
             # Setpoint line
             fig.add_hline(y=sp, line_dash="dot", line_color="#22c55e",
@@ -262,10 +299,10 @@ def live_view():
                 sec = np.array([(x - t0).total_seconds() for x, _ in recent])
                 vals = np.array([y for _, y in recent])
                 slope, _ = np.polyfit(sec, vals, 1)
-                if slope > 0.001 and vals[-1] < ALERT_ON:
-                    eta = (ALERT_ON - vals[-1]) / slope
+                if mode == "manual" and slope > 0.001 and vals[-1] < MANUAL_ALERT_ON:
+                    eta = (MANUAL_ALERT_ON - vals[-1]) / slope
                     if eta < 300:
-                        st.warning(f"📈 Predicted to reach {ALERT_ON}°C in ~{eta:.0f}s "
+                        st.warning(f"📈 Predicted to reach {MANUAL_ALERT_ON:.0f}°C in ~{eta:.0f}s "
                                    f"(rate +{slope*60:.2f}°C/min)")
 
 

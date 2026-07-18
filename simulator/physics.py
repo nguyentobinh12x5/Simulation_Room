@@ -32,6 +32,24 @@ class RoomState:
     ac_power_pct: float = 0.0    # 0.0 - 1.0 (0% - 100% of max AC power)
     setpoint: float = 25.0       # desired room temperature (°C)
     time_scale: float = 1.0      # simulation speed multiplier
+    mode: str = "manual"         # "manual" (user on/off) or "auto" (thermostat)
+
+
+def auto_hvac_decision(temp: float, setpoint: float, occupancy: int,
+                       currently_on: bool) -> bool:
+    """Thermostat decision for auto mode (occupancy-driven).
+
+    - Empty room (occupancy == 0): always off — nobody to cool for.
+    - Occupied and warmer than the target: engage the AC.
+    - Occupied but at/below target: hold current state. While people are
+      present the AC is never switched off; the PID simply modulates power
+      (down to 0%) to keep the room comfortable.
+    """
+    if occupancy <= 0:
+        return False             # empty room -> auto shut off
+    if temp > setpoint:
+        return True              # occupied & above target -> engage AC
+    return currently_on          # occupied & comfortable -> hold (PID modulates)
 
 
 def ac_output_temperature(power_pct: float) -> float:

@@ -1,6 +1,7 @@
 import random
 
-from physics import RoomState, clamp, step_humidity, step_occupancy, step_temperature
+from physics import (RoomState, auto_hvac_decision, clamp, step_humidity,
+                     step_occupancy, step_temperature)
 
 
 def run_temp(state, seconds):
@@ -116,3 +117,23 @@ def test_clamp():
     assert clamp(5, 0, 10) == 5
     assert clamp(-1, 0, 10) == 0
     assert clamp(99, 0, 10) == 10
+
+
+def test_auto_off_when_room_empty():
+    # No occupants -> always off, even if the room is hot
+    assert auto_hvac_decision(35.0, 24.0, 0, currently_on=True) is False
+
+
+def test_auto_engages_when_warm_and_occupied():
+    # Occupied and above target -> AC turns on
+    assert auto_hvac_decision(24.5, 24.0, 5, currently_on=False) is True
+
+
+def test_auto_stays_on_while_occupied_at_target():
+    # Occupied, cooled to/below target -> stays on (PID modulates power, no off)
+    assert auto_hvac_decision(23.5, 24.0, 5, currently_on=True) is True
+
+
+def test_auto_stays_off_when_occupied_but_cool():
+    # Occupied but not yet above target and currently off -> holds off
+    assert auto_hvac_decision(23.5, 24.0, 5, currently_on=False) is False

@@ -14,7 +14,8 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 
 from physics import (OCC_MAX, OCC_MIN, RoomState, ac_output_temperature,
-                     clamp, step_humidity, step_occupancy, step_temperature)
+                     auto_hvac_decision, clamp, step_humidity, step_occupancy,
+                     step_temperature)
 from pid_controller import PIDController
 
 BROKER_HOST = "localhost"
@@ -24,6 +25,7 @@ CMD_HVAC = f"{BASE}/cmd/hvac"
 CMD_OCCUPANCY = f"{BASE}/cmd/occupancy"
 CMD_SETPOINT = f"{BASE}/cmd/setpoint"
 CMD_TIMESCALE = f"{BASE}/cmd/timescale"
+CMD_MODE = f"{BASE}/cmd/mode"
 STATUS_TOPIC = f"{BASE}/status"
 HVAC_STATE_TOPIC = f"{BASE}/hvac/state"
 AC_DETAIL_TOPIC = f"{BASE}/ac/detail"
@@ -71,6 +73,10 @@ def handle_command(state: RoomState, topic: str, payload: bytes) -> RoomState:
             v = int(v)
             if v in VALID_TIME_SCALES:
                 return replace(state, time_scale=float(v))
+    elif topic == CMD_MODE:
+        m = data.get("mode")
+        if m in ("auto", "manual"):
+            return replace(state, mode=m)
     return state
 
 
@@ -87,7 +93,7 @@ class Simulator:
     def on_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe([
             (CMD_HVAC, 0), (CMD_OCCUPANCY, 0),
-            (CMD_SETPOINT, 0), (CMD_TIMESCALE, 0),
+            (CMD_SETPOINT, 0), (CMD_TIMESCALE, 0), (CMD_MODE, 0),
         ])
         client.publish(STATUS_TOPIC, "online", retain=True)
         self.publish_hvac_state()
@@ -96,17 +102,18 @@ class Simulator:
 
     def on_message(self, client, userdata, msg):
         before_hvac = self.state.hvac_on
+        before_mode = self.state.mode
         self.state = handle_command(self.state, msg.topic, msg.payload)
-        print(f"cmd {msg.topic}: {msg.payload!r} -> hvac_on={self.state.hvac_on}, "
-              f"occupancy={self.state.occupancy}, setpoint={self.state.setpoint}, "
-              f"time_scale={self.state.time_scale}")
+        print(f"cmd {msg.topic}: {msg.payload!r} -> mode={self.state.mode}, "
+              f"hvac_on={self.state.hvac_on}, occupancy={self.state.occupancy}, "
+              f"setpoint={self.state.setpoint}, time_scale={self.state.time_scale}")
 
         # Reset PID when HVAC is turned off
         if before_hvac and not self.state.hvac_on:
             self.pid.reset()
             self.state = replace(self.state, ac_power_pct=0.0)
 
-        if self.state.hvac_on != before_hvac:
+        if self.state.hvac_on != before_hvac or self.state.mode != before_mode:
             self.publish_hvac_state()
             self.publish_ac_detail()
 
@@ -122,7 +129,7 @@ class Simulator:
 
     def publish_ac_detail(self):
         ac_temp = ac_output_temperature(self.state.ac_power_pct)
-        mode = "auto" if self.state.hvac_on else "off"
+        mode = self.state.mode
         self.client.publish(AC_DETAIL_TOPIC,
                             json.dumps({
                                 "ac_power_pct": round(self.state.ac_power_pct, 2),
@@ -154,6 +161,20 @@ class Simulator:
             while True:
                 # Apply time_scale: each tick simulates time_scale seconds of physics
                 dt = self.state.time_scale
+
+                # Auto mode: engage when occupied & above target, off when empty
+                if self.state.mode == "auto":
+                    desired_on = auto_hvac_decision(
+                        self.state.temperature, self.state.setpoint,
+                        self.state.occupancy, self.state.hvac_on
+                    )
+                    if desired_on != self.state.hvac_on:
+                        self.state = replace(self.state, hvac_on=desired_on)
+                        if not desired_on:  # auto shut-off: stop cooling cleanly
+                            self.pid.reset()
+                            self.state = replace(self.state, ac_power_pct=0.0)
+                        self.publish_hvac_state()
+                        self.publish_ac_detail()
 
                 # PID controller: auto-adjust AC power when HVAC is on
                 if self.state.hvac_on:

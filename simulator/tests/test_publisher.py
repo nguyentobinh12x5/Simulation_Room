@@ -1,8 +1,8 @@
 import json
 
 from physics import RoomState
-from publisher import (CMD_HVAC, CMD_OCCUPANCY, CMD_SETPOINT, CMD_TIMESCALE,
-                       handle_command, make_payload)
+from publisher import (CMD_HVAC, CMD_MODE, CMD_OCCUPANCY, CMD_SETPOINT,
+                       CMD_TIMESCALE, handle_command, make_payload)
 
 
 def test_make_payload_matches_spec_format():
@@ -88,3 +88,18 @@ def test_timescale_invalid_value_rejected():
 def test_timescale_bool_rejected():
     s = RoomState(time_scale=1.0)
     assert handle_command(s, CMD_TIMESCALE, b'{"value": true}').time_scale == 1.0
+
+
+def test_mode_command_auto_and_manual():
+    s = RoomState(mode="manual")
+    s2 = handle_command(s, CMD_MODE, b'{"mode": "auto"}')
+    assert s2.mode == "auto"
+    s3 = handle_command(s2, CMD_MODE, b'{"mode": "manual"}')
+    assert s3.mode == "manual"
+
+
+def test_mode_command_invalid_rejected():
+    s = RoomState(mode="auto")
+    assert handle_command(s, CMD_MODE, b'{"mode": "banana"}').mode == "auto"
+    assert handle_command(s, CMD_MODE, b'{"value": "manual"}').mode == "auto"
+    assert handle_command(s, CMD_MODE, b"not json").mode == "auto"
